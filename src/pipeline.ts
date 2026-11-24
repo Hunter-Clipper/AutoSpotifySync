@@ -16,6 +16,7 @@ import { RateLimiter, sleep } from './util.js';
 export interface PlexLike {
   scan(localFolder: string): Promise<void>;
   search(title: string): Promise<PlexTrack[]>;
+  tracksByArtist(artist: string): Promise<PlexTrack[]>;
 }
 
 export interface PipelineOptions {
@@ -273,11 +274,20 @@ export class Pipeline {
     this.store.patch(t.id, { verifyTries: tries });
     await this.plex.scan(dirname(t.finalPath));
     const deadline = Date.now() + this.o.plexWaitMs;
+    const matchOpts = { minConfidence: this.o.minConfidence, strictAlbum: false };
+    let byTitle: PlexTrack[] = [];
+    let byArtist: PlexTrack[] = [];
     for (;;) {
-      const found = new PlexIndex(await this.plex.search(t.title)).match(t, {
-        minConfidence: this.o.minConfidence,
-        strictAlbum: false,
-      });
+      byTitle = await this.plex.search(t.title);
+      let found = new PlexIndex(byTitle).match(t, matchOpts);
+      if (found.status !== 'matched') {
+        // A text search can miss on punctuation or odd characters; the artist's own track list can't.
+        byArtist = await this.plex.tracksByArtist(t.artists[0] ?? '').catch((err: unknown) => {
+          this.log.debug('Plex artist lookup failed', { error: err });
+          return [] as PlexTrack[];
+        });
+        found = new PlexIndex(byArtist).match(t, matchOpts);
+      }
       if (found.status === 'matched') {
         this.store.patch(t.id, { status: 'complete', plexKey: found.plexKey, lastError: null, nextAttemptAt: null });
         return this.fresh(t.id);
@@ -285,6 +295,15 @@ export class Pipeline {
       if (Date.now() > deadline || this.signal?.aborted) break;
       await sleep(this.o.plexPollMs, this.signal);
     }
+    const sample = [...byTitle, ...byArtist].slice(0, 5).map((p) => `${p.artist} - ${p.title}`);
+    this.log.warn('Plex does not list the imported track yet', {
+      track: this.label(t),
+      wanted: { title: t.title, artists: t.artists, album: t.album },
+      titleSearchHits: byTitle.length,
+      artistTrackCount: byArtist.length,
+      sample,
+      file: t.finalPath,
+    });
     if (tries >= this.o.maxVerifyTries) throw new Error(`imported to ${t.finalPath} but Plex never listed it`);
     throw new Transient('imported, waiting for Plex to index it');
   }
@@ -335,6 +354,7 @@ export async function runDownloads(cfg: Config, store: Store, log: Logger, signa
   const plexRoot = PlexClient.rootOf(library);
   const plex: PlexLike = {
     search: (title) => plexClient.searchTracks(library, title),
+    tracksByArtist: (artist) => plexClient.tracksByArtist(library, artist),
     scan: async (localFolder) => {
       if (!plexRoot) return plexClient.scan(library);
       const rel = relative(resolve(opts.musicDir), resolve(localFolder)).split(/[\\/]/).join('/');

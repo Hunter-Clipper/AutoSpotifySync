@@ -43,10 +43,15 @@ let dir: string;
 let store: Store;
 let dl: FakeDownloader;
 let plexTracks: PlexTrack[];
+let artistTracks: PlexTrack[] = [];
 let mediaOk = { ok: true } as { ok: boolean; reason?: string };
 
 const media: MediaLike = { check: async () => mediaOk, writeTags: async () => undefined };
-const plex: PlexLike = { scan: async () => undefined, search: async () => plexTracks };
+const plex: PlexLike = {
+  scan: async () => undefined,
+  search: async () => plexTracks,
+  tracksByArtist: async () => artistTracks,
+};
 
 const opts = (): PipelineOptions => ({
   format: 'mp3', bitrate: '320k', toleranceSec: 5, maxAttempts: 3, cooldownDays: 7, concurrency: 2,
@@ -72,6 +77,7 @@ beforeEach(() => {
   store = new Store(join(dir, 'db'));
   dl = new FakeDownloader();
   plexTracks = [];
+  artistTracks = [];
   mediaOk = { ok: true };
 });
 afterEach(() => {
@@ -172,6 +178,15 @@ describe('Pipeline', () => {
     expect(existsSync(join(dir, 'staging/quarantine/a.mp3'))).toBe(true);
     expect(existsSync(join(dir, 'music'))).toBe(false);
     expect(store.getTrack('a')!.lastError).toContain('duration');
+  });
+
+  it('finds the track via the artist lookup when the title search misses it', async () => {
+    seed(['a']);
+    plexTracks = [];
+    artistTracks = [inPlex('a')];
+    const s = await make().run(store.eligibleMissing(0));
+    expect(s.completed).toBe(1);
+    expect(store.getTrack('a')!.plexKey).toBe('ka');
   });
 
   it('keeps an imported track pending while Plex has not indexed it, then fails after the limit', async () => {

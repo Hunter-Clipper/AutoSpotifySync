@@ -1,4 +1,5 @@
 import type { Logger } from './logger.js';
+import { normalizeArtist, similarity } from './normalize.js';
 import type { PlexTrack } from './types.js';
 
 export interface PlexDirectory { key: string; title: string; type: string; Location?: { path: string }[] }
@@ -37,13 +38,53 @@ export class PlexClient {
     if (!res.ok) throw new Error(`Plex scan request failed: HTTP ${res.status}`);
   }
 
-  /** Search the library's tracks by title text. */
+  /**
+   * Find tracks by title. Combines Plex's exact `title` filter with its free-text search and
+   * merges the results: the text search can miss titles containing punctuation such as " - ".
+   */
   async searchTracks(library: PlexDirectory, query: string): Promise<PlexTrack[]> {
-    const data = await this.get<{ MediaContainer: { Metadata?: PlexMeta[] } }>(
-      `library/sections/${library.key}/search`,
-      { type: '10', query },
-    );
-    return (data.MediaContainer.Metadata ?? []).map(toPlexTrack);
+    type Res = { MediaContainer: { Metadata?: PlexMeta[] } };
+    const [filtered, searched] = await Promise.all([
+      this.get<Res>(`library/sections/${library.key}/all`, { type: '10', title: query }).catch(() => undefined),
+      this.get<Res>(`library/sections/${library.key}/search`, { type: '10', query }).catch(() => undefined),
+    ]);
+    if (!filtered && !searched) throw new Error('Plex track search failed');
+    const byKey = new Map<string, PlexTrack>();
+    for (const res of [filtered, searched]) {
+      for (const m of res?.MediaContainer.Metadata ?? []) byKey.set(m.ratingKey, toPlexTrack(m));
+    }
+    return [...byKey.values()];
+  }
+
+  /**
+   * All tracks by artists whose name matches `name`. Goes artist -> allLeaves instead of a text
+   * search over track titles, so punctuation in a title cannot hide the track.
+   */
+  async tracksByArtist(library: PlexDirectory, name: string): Promise<PlexTrack[]> {
+    if (!name) return [];
+    const folded = name.normalize('NFKD').replace(/\p{M}/gu, '').replace(/Ø/g, 'O').replace(/ø/g, 'o');
+    const wanted = normalizeArtist(name);
+    const seen = new Set<string>();
+    const out: PlexTrack[] = [];
+    for (const query of new Set([name, folded])) {
+      const found = await this.get<{ MediaContainer: { Metadata?: PlexMeta[] } }>(
+        `library/sections/${library.key}/search`,
+        { type: '8', query },
+      );
+      const artists = (found.MediaContainer.Metadata ?? [])
+        .filter((a) => similarity(normalizeArtist(a.title), wanted) >= 0.8)
+        .slice(0, 3);
+      for (const a of artists) {
+        if (seen.has(a.ratingKey)) continue;
+        seen.add(a.ratingKey);
+        const leaves = await this.get<{ MediaContainer: { Metadata?: PlexMeta[] } }>(
+          `library/metadata/${a.ratingKey}/allLeaves`,
+        );
+        out.push(...(leaves.MediaContainer.Metadata ?? []).map(toPlexTrack));
+      }
+      if (out.length) break;
+    }
+    return out;
   }
 
   /** Resolve the music library: by name if given, else the only music library. */

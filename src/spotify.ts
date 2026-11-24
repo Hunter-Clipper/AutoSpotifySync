@@ -167,7 +167,7 @@ export class SpotifyClient {
       const urls = (this.cfg.SPOTIFY_PLAYLIST_URLS ?? '').split(',').map((u) => u.trim()).filter(Boolean);
       if (urls.length === 0) {
         throw new Error(
-          'Public-only mode (no SPOTIFY_REFRESH_TOKEN) needs SPOTIFY_PLAYLIST_URLS with at least one playlist or album URL.',
+          'No SPOTIFY_REFRESH_TOKEN is set. To sync your whole library, run the `auth` command once and set the token it prints. (Public-only mode instead needs SPOTIFY_PLAYLIST_URLS with at least one album URL.)',
         );
       }
       this.log.warn(

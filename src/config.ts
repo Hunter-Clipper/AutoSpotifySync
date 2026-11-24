@@ -36,7 +36,7 @@ const schema = z.object({
   RETRY_COOLDOWN_DAYS: z.coerce.number().min(0).default(7),
   MATCH_STRICT_ALBUM: bool(false),
   MATCH_MIN_CONFIDENCE: z.coerce.number().min(0.5).max(1).default(0.85),
-  DURATION_TOLERANCE_SEC: z.coerce.number().min(0).default(5),
+  DURATION_TOLERANCE_SEC: z.coerce.number().min(0).default(12),
   SYNC_INTERVAL: z
     .string()
     .regex(/^\d+[smhd]$/, 'use a number plus s/m/h/d, e.g. 6h')
