@@ -1,0 +1,51 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+*.token
+refresh_token*
+
+# Runtime data (SQLite DB holds your library + job state)
+config/
+data/
+staging/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+logs/
+
+# Downloaded / test media
+music/
+downloads/
+*.mp3
+*.flac
+*.ogg
+*.wav
+*.m4a
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+.npm/
+.eslintcache
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local settings
+.claude/settings.local.json
