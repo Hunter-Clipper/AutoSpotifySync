@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+node_modules
+dist
+config
+data
+staging
+music
+downloads
+*.db
+*.log
+test
+PLAN.md
