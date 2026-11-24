@@ -54,7 +54,7 @@ export async function runCycle(cfg: Config, store: Store, log: Logger, signal?: 
     !!downloads.fatal ||
     (playlists ? playlists.created + playlists.updated + playlists.deleted + playlists.errors > 0 : false);
   if (cfg.NOTIFY_ON === 'always' || changed) {
-    await notify(cfg.NOTIFY_URL, 'AutoSpotifySync run finished', summarize(result, store.counts()), log);
+    await notify(cfg.NOTIFY_URL, 'Spotilex run finished', summarize(result, store.counts()), log);
   }
   return result;
 }
@@ -83,7 +83,7 @@ export async function runDaemon(cfg: Config, store: Store, log: Logger): Promise
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.error('Cycle failed', { error: msg });
-      await notify(cfg.NOTIFY_URL, 'AutoSpotifySync cycle failed', msg, log);
+      await notify(cfg.NOTIFY_URL, 'Spotilex cycle failed', msg, log);
     }
     await sleep(interval, stop.signal);
   }

@@ -1,8 +1,10 @@
 <p align="center"><img src="assets/icon.png" width="128" alt="Two arrows chasing each other around an equalizer"></p>
 
-# AutoSpotifySync
+# Spotilex
 
 > The ultimate tool to sync Spotify to Plex: find what's missing, auto-download it, and keep your playlists in sync.
+
+*Formerly AutoSpotifySync.* Existing installs: change the container image to `ghcr.io/hunter-clipper/spotilex:latest`; your `/config` data and settings carry over unchanged.
 
 Sync your Spotify library into a local SQLite database, cross-reference it with your Plex
 music library, and report what is missing. Later milestones add automatic download (via a
@@ -50,7 +52,7 @@ Register `http://127.0.0.1:8888/callback` as a redirect URI in your Spotify app 
 (Spotify does not allow `localhost`; set `SPOTIFY_REDIRECT_URI` to use a different one).
 
 ```bash
-docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... autospotifysync auth
+docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... spotilex auth
 ```
 
 ### Spotify API limits to know about
@@ -65,9 +67,9 @@ Per Spotify's February 2026 API changes (which apply to apps in development mode
 ## Run
 ```bash
 cp .env.example .env   # fill in values; never commit .env
-docker build -t autospotifysync .
-docker run --rm --env-file .env -v /path/to/appdata/autospotifysync:/config autospotifysync sync
-docker run --rm --env-file .env -v /path/to/appdata/autospotifysync:/config autospotifysync missing
+docker build -t spotilex .
+docker run --rm --env-file .env -v /path/to/appdata/spotilex:/config spotilex sync
+docker run --rm --env-file .env -v /path/to/appdata/spotilex:/config spotilex missing
 ```
 The container runs as `99:100` (Unraid `nobody:users`); `/config` must be writable by it.
 
@@ -75,7 +77,7 @@ Commands: `daemon` (container default), `run` (one full pass), `sync`, `status`,
 `missing`, `review`, `failed`, `retry [trackId]`, `playlists`, `auth`. Run any of them by appending the
 command to the `docker run` line.
 
-Unraid: a template is in [`unraid/autospotifysync.xml`](unraid/autospotifysync.xml). The
+Unraid: a template is in [`unraid/spotilex.xml`](unraid/spotilex.xml). The
 container needs `/config` (appdata) and `/music` (the same share Plex reads) mounted
 read-write, and runs as `99:100`.
 

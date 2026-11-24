@@ -1,5 +1,5 @@
 {
-  "name": "autospotifysync",
+  "name": "spotilex",
   "version": "0.0.4-alpha",
   "description": "Sync a Spotify library to SQLite, cross-reference it with Plex, and optionally download and import what is missing.",
   "license": "MIT",
@@ -9,7 +9,7 @@
     "node": ">=22.13"
   },
   "bin": {
-    "spotify-sync": "dist/cli.js"
+    "spotilex": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

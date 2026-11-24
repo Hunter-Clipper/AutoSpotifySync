@@ -7,7 +7,7 @@ import { Store } from './db.js';
 import { createLogger } from './logger.js';
 import { runSync } from './sync.js';
 
-const program = new Command('spotify-sync').description(
+const program = new Command('spotilex').description(
   'Sync a Spotify library, cross-reference it with Plex, and report what is missing.',
 );
 

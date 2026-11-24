@@ -94,6 +94,7 @@ export class Store {
 
   constructor(dir: string) {
     mkdirSync(dir, { recursive: true });
+    // File name predates the Spotilex rename; kept so existing installs keep their data.
     this.db = new DatabaseSync(join(dir, 'autospotifysync.db'));
     this.db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
     this.migrate();

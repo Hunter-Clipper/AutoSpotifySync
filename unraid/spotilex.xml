@@ -1,24 +1,24 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>AutoSpotifySync</Name>
-  <Repository>ghcr.io/hunter-clipper/autospotifysync:latest</Repository>
-  <Registry>https://github.com/Hunter-Clipper/AutoSpotifySync/pkgs/container/autospotifysync</Registry>
+  <Name>Spotilex</Name>
+  <Repository>ghcr.io/hunter-clipper/spotilex:latest</Repository>
+  <Registry>https://github.com/Hunter-Clipper/Spotilex/pkgs/container/spotilex</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/Hunter-Clipper/AutoSpotifySync/issues</Support>
-  <Project>https://github.com/Hunter-Clipper/AutoSpotifySync</Project>
-  <TemplateURL>https://raw.githubusercontent.com/Hunter-Clipper/AutoSpotifySync/main/unraid/autospotifysync.xml</TemplateURL>
+  <Support>https://github.com/Hunter-Clipper/Spotilex/issues</Support>
+  <Project>https://github.com/Hunter-Clipper/Spotilex</Project>
+  <TemplateURL>https://raw.githubusercontent.com/Hunter-Clipper/Spotilex/main/unraid/spotilex.xml</TemplateURL>
   <Overview>Syncs your Spotify library to a local database, compares it with your Plex music library, and reports what is missing. Optionally downloads missing tracks through a spotify-downloader API, imports them into your music share and verifies them in Plex. Safe by default: AUTO_DOWNLOAD is off and DRY_RUN is on. First run `auth` once from a console to get a Spotify refresh token (see the project README).</Overview>
-  <Icon>https://raw.githubusercontent.com/Hunter-Clipper/AutoSpotifySync/main/assets/icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/Hunter-Clipper/Spotilex/main/assets/icon.png</Icon>
   <Category>MediaApp:Music Tools:</Category>
   <ExtraParams>--user 99:100</ExtraParams>
   <PostArgs/>
-  <Config Name="AppData" Target="/config" Default="/mnt/user/appdata/autospotifysync" Mode="rw" Description="Database, logs and download staging" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/autospotifysync</Config>
+  <Config Name="AppData" Target="/config" Default="/mnt/user/appdata/spotilex" Mode="rw" Description="Database, logs and download staging" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spotilex</Config>
   <Config Name="Music library" Target="/music" Default="/mnt/user/Music" Mode="rw" Description="The same music share Plex reads. Imported files are written here." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/Music</Config>
   <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="From developer.spotify.com/dashboard" Type="Variable" Display="always" Required="true" Mask="false"/>
   <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="From developer.spotify.com/dashboard" Type="Variable" Display="always" Required="true" Mask="true"/>
-  <Config Name="Spotify Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Generate once with: docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... ghcr.io/hunter-clipper/autospotifysync auth" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Spotify Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Generate once with: docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... ghcr.io/hunter-clipper/spotilex auth" Type="Variable" Display="always" Required="false" Mask="true"/>
   <Config Name="Public album URLs" Target="SPOTIFY_PLAYLIST_URLS" Default="" Mode="" Description="Only used without a refresh token (public-only mode, albums only): comma-separated Spotify album URLs" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Plex URL" Target="PLEX_URL" Default="http://192.168.1.2:32400" Mode="" Description="Your Plex server address" Type="Variable" Display="always" Required="true" Mask="false"/>
   <Config Name="Plex Token" Target="PLEX_TOKEN" Default="" Mode="" Description="X-Plex-Token" Type="Variable" Display="always" Required="true" Mask="true"/>
