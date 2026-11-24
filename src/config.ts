@@ -13,6 +13,7 @@ const schema = z.object({
   SPOTIFY_CLIENT_SECRET: z.string().min(1),
   SPOTIFY_REFRESH_TOKEN: z.string().optional(),
   SPOTIFY_PLAYLIST_URLS: z.string().optional(),
+  SPOTIFY_REDIRECT_URI: z.string().url().optional(),
 
   // Plex
   PLEX_URL: z.string().url().optional(),

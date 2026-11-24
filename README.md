@@ -18,10 +18,14 @@ reports. Nothing is downloaded or modified in your music library yet.
 | Public-only | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_PLAYLIST_URLS` | Listed **albums** only (see limits) |
 | Full library | Above, plus `SPOTIFY_REFRESH_TOKEN` | Your playlists, Liked Songs, saved albums |
 
-Generating the refresh token with a built-in command is planned. Until then, use any
-standard Spotify authorization-code flow with scopes `user-library-read`,
-`playlist-read-private` and `playlist-read-collaborative`. Register a redirect URI of the
-form `http://127.0.0.1:PORT/callback` (Spotify does not allow `localhost`).
+Generate the refresh token once with the built-in command. It works from any machine: you
+approve in your own browser, then paste the (failed-to-load) redirect URL back.
+Register `http://127.0.0.1:8888/callback` as a redirect URI in your Spotify app first
+(Spotify does not allow `localhost`; set `SPOTIFY_REDIRECT_URI` to use a different one).
+
+```bash
+docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... autospotifysync auth
+```
 
 ### Spotify API limits to know about
 Per Spotify's February 2026 API changes (which apply to apps in development mode):
@@ -41,7 +45,7 @@ docker run --rm --env-file .env -v /path/to/appdata/autospotifysync:/config auto
 ```
 The container runs as `99:100` (Unraid `nobody:users`); `/config` must be writable by it.
 
-Commands: `sync`, `status`, `missing [-n N] [--json]`, `review [-n N] [--json]`.
+Commands: `auth`, `sync`, `status`, `missing [-n N] [--json]`, `review [-n N] [--json]`.
 
 ## Develop
 ```bash
