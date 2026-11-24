@@ -26,7 +26,13 @@ async function exists(p: string): Promise<boolean> {
   return stat(p).then(() => true, () => false);
 }
 
-/** Move a staged file into the library without overwriting. Returns whether a move happened. */
+/**
+ * Move a staged file into the library without overwriting. Returns whether a move happened.
+ *
+ * Across filesystems (staging and the music share are usually different mounts) a move is a copy.
+ * The copy goes to a temporary name in the destination folder and is renamed into place, so a crash
+ * mid-copy can never leave a truncated file under the final name for the next run to mistake as done.
+ */
 export async function moveInto(src: string, destFile: string): Promise<'moved' | 'exists'> {
   await mkdir(dirname(destFile), { recursive: true, mode: 0o775 });
   if (await exists(destFile)) {
@@ -37,7 +43,15 @@ export async function moveInto(src: string, destFile: string): Promise<'moved' |
     await rename(src, destFile);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
-    await copyFile(src, destFile);
+    const part = `${destFile}.part`; // not an audio extension, so Plex ignores it
+    try {
+      await rm(part, { force: true }); // leftover from an earlier interrupted attempt
+      await copyFile(src, part);
+      await rename(part, destFile);
+    } catch (copyErr) {
+      await rm(part, { force: true });
+      throw copyErr;
+    }
     await rm(src, { force: true });
   }
   return 'moved';
