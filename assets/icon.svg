@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">Two arrows chasing each other around an equalizer: music syncing between libraries</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#23262B"/><stop offset="1" stop-color="#121417"/>
+    </linearGradient>
+    <linearGradient id="g1" gradientUnits="userSpaceOnUse" x1="108" y1="256" x2="404" y2="256">
+      <stop offset="0" stop-color="#1DB954"/><stop offset="1" stop-color="#77AE34"/>
+    </linearGradient>
+    <linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="404" y1="256" x2="108" y2="256">
+      <stop offset="0" stop-color="#E5A00D"/><stop offset="1" stop-color="#8BAB2D"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M 115.2 210.3 A 148 148 0 0 1 393.2 200.6" fill="none" stroke="url(#g1)" stroke-width="34" stroke-linecap="round"/>
+  <polygon points="409.7,241.4 429.6,183.7 355.4,213.7" fill="#77AE34" stroke="#77AE34" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 396.8 301.7 A 148 148 0 0 1 118.8 311.4" fill="none" stroke="url(#g2)" stroke-width="34" stroke-linecap="round"/>
+  <polygon points="102.3,270.6 82.4,328.3 156.6,298.3" fill="#8BAB2D" stroke="#8BAB2D" stroke-width="6" stroke-linejoin="round"/>
+  <rect x="179.0" y="224.0" width="22" height="64" rx="11.0" fill="#1DB954"/><rect x="212.0" y="200.0" width="22" height="112" rx="11.0" fill="#4FB342"/><rect x="245.0" y="178.0" width="22" height="156" rx="11.0" fill="#81AC30"/><rect x="278.0" y="200.0" width="22" height="112" rx="11.0" fill="#B3A61F"/><rect x="311.0" y="224.0" width="22" height="64" rx="11.0" fill="#E5A00D"/>
+</svg>

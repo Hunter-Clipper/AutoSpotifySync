@@ -10,6 +10,7 @@
   <Project>https://github.com/Hunter-Clipper/AutoSpotifySync</Project>
   <TemplateURL>https://raw.githubusercontent.com/Hunter-Clipper/AutoSpotifySync/main/unraid/autospotifysync.xml</TemplateURL>
   <Overview>Syncs your Spotify library to a local database, compares it with your Plex music library, and reports what is missing. Optionally downloads missing tracks through a spotify-downloader API, imports them into your music share and verifies them in Plex. Safe by default: AUTO_DOWNLOAD is off and DRY_RUN is on. First run `auth` once from a console to get a Spotify refresh token (see the project README).</Overview>
+  <Icon>https://raw.githubusercontent.com/Hunter-Clipper/AutoSpotifySync/main/assets/icon.png</Icon>
   <Category>MediaApp:Music Tools:</Category>
   <ExtraParams>--user 99:100</ExtraParams>
   <PostArgs/>

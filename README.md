@@ -1,4 +1,8 @@
+<p align="center"><img src="assets/icon.png" width="128" alt="Two arrows chasing each other around an equalizer"></p>
+
 # AutoSpotifySync
+
+> The ultimate tool to sync Spotify to Plex: find what's missing, auto-download it, and keep your playlists in sync.
 
 Sync your Spotify library into a local SQLite database, cross-reference it with your Plex
 music library, and report what is missing. Later milestones add automatic download (via a
