@@ -31,6 +31,8 @@ export interface PlexTrack {
   artist: string; // grandparentTitle (album artist)
   trackArtist: string | null; // originalTitle, when Plex has a per-track artist
   album: string;
+  /** File paths Plex has for this track (Media[].Part[].file), as Plex sees them. */
+  files?: string[];
 }
 
 export type MatchStatus = 'matched' | 'review' | 'missing';

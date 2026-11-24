@@ -54,6 +54,8 @@ export class PlexIndex {
       if (versions && titleSim < VERSIONED_TITLE_SIM) continue;
       let artistSim = 0;
       for (const a of artists) for (const b of e.artists) artistSim = Math.max(artistSim, similarity(a, b));
+      // Compilations are filed under "Various Artists": the album then stands in for the artist.
+      if (artistSim < MIN_ARTIST_SIM && e.artists.includes('various artists') && similarity(album, e.album) >= 0.8) artistSim = 0.9;
       // The artist is essential: a same-titled song by someone else is a different song.
       if (artistSim < MIN_ARTIST_SIM) continue;
       const score = titleSim * 0.65 + artistSim * 0.35;

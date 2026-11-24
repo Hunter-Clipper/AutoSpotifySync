@@ -9,6 +9,7 @@ interface PlexMeta {
   grandparentTitle?: string;
   originalTitle?: string;
   parentTitle?: string;
+  Media?: { Part?: { file?: string }[] }[];
 }
 
 export interface PlexPlaylistApi {
@@ -164,6 +165,21 @@ export class PlexClient implements PlexPlaylistApi {
   }
 
   /**
+   * The most recently added tracks, with their file paths. Plex's own metadata agent may retitle or
+   * regroup a track (e.g. strip "(Album Version)", file it under "Various Artists"), so the file
+   * path is the only reliable way to prove a specific imported file is in the library.
+   */
+  async recentTracks(library: PlexDirectory, limit = 200): Promise<PlexTrack[]> {
+    const data = await this.get<{ MediaContainer: { Metadata?: PlexMeta[] } }>(`library/sections/${library.key}/all`, {
+      type: '10',
+      sort: 'addedAt:desc',
+      'X-Plex-Container-Start': '0',
+      'X-Plex-Container-Size': String(limit),
+    });
+    return (data.MediaContainer.Metadata ?? []).map(toPlexTrack);
+  }
+
+  /**
    * All tracks by artists whose name matches `name`. Goes artist -> allLeaves instead of a text
    * search over track titles, so punctuation in a title cannot hide the track.
    */
@@ -232,5 +248,6 @@ function toPlexTrack(m: PlexMeta): PlexTrack {
     artist: m.grandparentTitle ?? '',
     trackArtist: m.originalTitle ?? null,
     album: m.parentTitle ?? '',
+    files: (m.Media ?? []).flatMap((x) => (x.Part ?? []).map((p) => p.file).filter((f): f is string => !!f)),
   };
 }

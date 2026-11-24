@@ -1,5 +1,5 @@
 import { mkdir, rename, rm, stat } from 'node:fs/promises';
-import { dirname, join, relative, posix, resolve } from 'node:path';
+import { dirname, join, relative, posix, resolve, sep } from 'node:path';
 import type { Config } from './config.js';
 import { requireSettings } from './config.js';
 import type { FullTrack, Store } from './db.js';
@@ -17,6 +17,7 @@ export interface PlexLike {
   scan(localFolder: string): Promise<void>;
   search(title: string): Promise<PlexTrack[]>;
   tracksByArtist(artist: string): Promise<PlexTrack[]>;
+  recentTracks(): Promise<PlexTrack[]>;
 }
 
 export interface PipelineOptions {
@@ -275,22 +276,43 @@ export class Pipeline {
     await this.plex.scan(dirname(t.finalPath));
     const deadline = Date.now() + this.o.plexWaitMs;
     const matchOpts = { minConfidence: this.o.minConfidence, strictAlbum: false };
+    // Library-relative path of the file we imported, e.g. "Artist/Album/03 - Title.mp3".
+    const suffix = relative(resolve(this.o.musicDir), resolve(t.finalPath)).split(sep).join('/').normalize('NFC');
+    const byPath = (pool: PlexTrack[]) =>
+      pool.find((p) => (p.files ?? []).some((f) => f.normalize('NFC') === suffix || f.normalize('NFC').endsWith(`/${suffix}`)));
+    const done = (key: string) => {
+      this.store.patch(t.id, { status: 'complete', plexKey: key, lastError: null, nextAttemptAt: null });
+      return this.fresh(t.id);
+    };
+    let recent: PlexTrack[] = [];
     let byTitle: PlexTrack[] = [];
     let byArtist: PlexTrack[] = [];
     for (;;) {
+      // 1. Exact: does Plex list a track whose file is the one we just imported?
+      recent = await this.plex.recentTracks().catch((err: unknown) => {
+        this.log.debug('Plex recent-tracks lookup failed', { error: err });
+        return [] as PlexTrack[];
+      });
+      const hit = byPath(recent);
+      if (hit) return done(hit.key);
+
       byTitle = await this.plex.search(t.title);
-      let found = new PlexIndex(byTitle).match(t, matchOpts);
-      if (found.status !== 'matched') {
-        // A text search can miss on punctuation or odd characters; the artist's own track list can't.
-        byArtist = await this.plex.tracksByArtist(t.artists[0] ?? '').catch((err: unknown) => {
-          this.log.debug('Plex artist lookup failed', { error: err });
-          return [] as PlexTrack[];
-        });
-        found = new PlexIndex(byArtist).match(t, matchOpts);
-      }
-      if (found.status === 'matched') {
-        this.store.patch(t.id, { status: 'complete', plexKey: found.plexKey, lastError: null, nextAttemptAt: null });
-        return this.fresh(t.id);
+      const titleHit = byPath(byTitle);
+      if (titleHit) return done(titleHit.key);
+      byArtist = await this.plex.tracksByArtist(t.artists[0] ?? '').catch((err: unknown) => {
+        this.log.debug('Plex artist lookup failed', { error: err });
+        return [] as PlexTrack[];
+      });
+      const artistHit = byPath(byArtist);
+      if (artistHit) return done(artistHit.key);
+
+      // 2. Fallback only when Plex returned no file paths at all (older servers): compare title/artist.
+      const pool = [...recent, ...byTitle, ...byArtist];
+      if (!pool.some((p) => (p.files ?? []).length > 0)) {
+        for (const candidates of [byTitle, byArtist]) {
+          const found = new PlexIndex(candidates).match(t, matchOpts);
+          if (found.status === 'matched') return done(found.plexKey!);
+        }
       }
       if (Date.now() > deadline || this.signal?.aborted) break;
       await sleep(this.o.plexPollMs, this.signal);
@@ -299,8 +321,11 @@ export class Pipeline {
     this.log.warn('Plex does not list the imported track yet', {
       track: this.label(t),
       wanted: { title: t.title, artists: t.artists, album: t.album },
+      recentTrackCount: recent.length,
       titleSearchHits: byTitle.length,
       artistTrackCount: byArtist.length,
+      expectedPathEnd: suffix,
+      plexFilesSeen: [...recent, ...byTitle, ...byArtist].flatMap((p) => p.files ?? []).slice(0, 3),
       sample,
       file: t.finalPath,
     });
@@ -355,6 +380,7 @@ export async function runDownloads(cfg: Config, store: Store, log: Logger, signa
   const plex: PlexLike = {
     search: (title) => plexClient.searchTracks(library, title),
     tracksByArtist: (artist) => plexClient.tracksByArtist(library, artist),
+    recentTracks: () => plexClient.recentTracks(library),
     scan: async (localFolder) => {
       if (!plexRoot) return plexClient.scan(library);
       const rel = relative(resolve(opts.musicDir), resolve(localFolder)).split(/[\\/]/).join('/');

@@ -83,4 +83,14 @@ describe('PlexIndex.match', () => {
       expect(idx.match(sp('Song - Remastered 2011', ['Band']), opts).status).toBe('matched');
     });
   });
+
+  describe('compilations filed under Various Artists', () => {
+    const idx = new PlexIndex([plex('Bird Machine', 'Various Artists', "Jeffree's Vol. 7")]);
+    it('matches via the album when the artist is "Various Artists"', () => {
+      expect(idx.match(sp('Bird Machine', ['DJ Snake', 'Alesia'], "Jeffree's Vol. 7"), opts).status).toBe('matched');
+    });
+    it('does not match a same-titled track from a different album', () => {
+      expect(idx.match(sp('Bird Machine', ['DJ Snake', 'Alesia'], 'Some Other Album'), opts).status).toBe('missing');
+    });
+  });
 });

@@ -256,7 +256,8 @@ export class Store {
     return Number(
       this.db
         .prepare(
-          `UPDATE tracks SET status='missing', attempts=0, next_attempt_at=NULL, updated_at=datetime('now')
+          `UPDATE tracks SET status=CASE WHEN final_path IS NOT NULL THEN 'imported' ELSE 'missing' END,
+             attempts=0, verify_tries=0, next_attempt_at=NULL, updated_at=datetime('now')
            WHERE status='failed' AND next_attempt_at IS NOT NULL AND next_attempt_at <= ?`,
         )
         .run(nowIso).changes,
@@ -265,7 +266,9 @@ export class Store {
 
   /** Manual retry: put failed track(s) (one id, or all) back in the queue immediately. */
   retryFailed(id?: string): number {
-    const base = `UPDATE tracks SET status='missing', attempts=0, next_attempt_at=NULL, last_error=NULL,
+    // A track whose file is already in the library only needs re-verifying, not re-downloading.
+    const base = `UPDATE tracks SET status=CASE WHEN final_path IS NOT NULL THEN 'imported' ELSE 'missing' END,
+                  attempts=0, verify_tries=0, next_attempt_at=NULL, last_error=NULL,
                   updated_at=datetime('now') WHERE status='failed'`;
     const res = id ? this.db.prepare(`${base} AND id = ?`).run(id) : this.db.prepare(base).run();
     return Number(res.changes);

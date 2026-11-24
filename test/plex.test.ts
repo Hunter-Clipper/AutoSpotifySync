@@ -177,3 +177,25 @@ describe('PlexClient.scan', () => {
     expect(seen).toEqual(['POST /library/sections/7/refresh']);
   });
 });
+
+describe('PlexClient.recentTracks and file paths', () => {
+  it('asks for the newest tracks and exposes their file paths', async () => {
+    stub(() =>
+      container([
+        {
+          ratingKey: '9', title: 'Dying (Brown & Gammon remix)', grandparentTitle: 'Kill the Noise', parentTitle: 'Kill Kill Kill',
+          Media: [{ Part: [{ file: '/data/Music/Kill The Noise/Kill Kill Kill/08 - Dying.mp3' }] }],
+        },
+        { ratingKey: '10', title: 'No media info' },
+      ]),
+    );
+    const r = await client().recentTracks(lib, 50);
+    expect(r[0]!.files).toEqual(['/data/Music/Kill The Noise/Kill Kill Kill/08 - Dying.mp3']);
+    expect(r[1]!.files).toEqual([]);
+    const u = calls[0]!;
+    expect(u.pathname).toBe('/library/sections/7/all');
+    expect(u.searchParams.get('type')).toBe('10');
+    expect(u.searchParams.get('sort')).toBe('addedAt:desc');
+    expect(u.searchParams.get('X-Plex-Container-Size')).toBe('50');
+  });
+});

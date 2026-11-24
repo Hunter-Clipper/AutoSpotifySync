@@ -44,6 +44,7 @@ let store: Store;
 let dl: FakeDownloader;
 let plexTracks: PlexTrack[];
 let artistTracks: PlexTrack[] = [];
+let recentTracks: PlexTrack[] = [];
 let mediaOk = { ok: true } as { ok: boolean; reason?: string };
 
 const media: MediaLike = { check: async () => mediaOk, writeTags: async () => undefined };
@@ -51,6 +52,7 @@ const plex: PlexLike = {
   scan: async () => undefined,
   search: async () => plexTracks,
   tracksByArtist: async () => artistTracks,
+  recentTracks: async () => recentTracks,
 };
 
 const opts = (): PipelineOptions => ({
@@ -78,6 +80,7 @@ beforeEach(() => {
   dl = new FakeDownloader();
   plexTracks = [];
   artistTracks = [];
+  recentTracks = [];
   mediaOk = { ok: true };
 });
 afterEach(() => {
@@ -187,6 +190,56 @@ describe('Pipeline', () => {
     const s = await make().run(store.eligibleMissing(0));
     expect(s.completed).toBe(1);
     expect(store.getTrack('a')!.plexKey).toBe('ka');
+  });
+
+  describe('verification by file path (Plex may retitle or regroup tracks)', () => {
+    const plexFile = (rel: string) => `/data/Music/${rel}`;
+    const entry = (key: string, title: string, artist: string, rel: string): PlexTrack => ({
+      key, title, artist, trackArtist: null, album: 'Record', files: [plexFile(rel)],
+    });
+
+    it('completes when Plex lists our file under a different title and artist', async () => {
+      seed(['a']);
+      // Plex's agent turned "Song a" by "Band" into "Totally Different (Original Mix)" by "Various Artists"
+      recentTracks = [entry('kx', 'Totally Different (Original Mix)', 'Various Artists', 'Band/Record/01 - Song a.mp3')];
+      const s = await make().run(store.eligibleMissing(0));
+      expect(s.completed).toBe(1);
+      expect(store.getTrack('a')!.plexKey).toBe('kx');
+    });
+
+    it('finds the file through the artist lookup or title search too', async () => {
+      seed(['a', 'b']);
+      artistTracks = [entry('ka2', 'Renamed A', 'Band', 'Band/Record/01 - Song a.mp3')];
+      plexTracks = [entry('kb2', 'Renamed B', 'Other', 'Band/Record/01 - Song b.mp3')];
+      const s = await make().run(store.eligibleMissing(0));
+      expect(s.completed).toBe(2);
+    });
+
+    it('does NOT accept a same-titled track at a different path when Plex reports file paths', async () => {
+      seed(['a']);
+      // the user already owns "Song a" at another location; that is not proof our import is indexed
+      plexTracks = [entry('old', 'Song a', 'Band', 'Band/Greatest Hits/05 - Song a.mp3')];
+      const s = await make().run(store.eligibleMissing(0));
+      expect(s.deferred).toBe(1);
+      expect(store.getTrack('a')!.status).toBe('imported');
+    });
+
+    it('matches regardless of Unicode normalization in the path', async () => {
+      seed(['a']);
+      store.patch('a', {});
+      recentTracks = [entry('kx', 'x', 'y', 'Band/Record/01 - Song a.mp3'.normalize('NFD'))];
+      expect((await make().run(store.eligibleMissing(0))).completed).toBe(1);
+    });
+  });
+
+  it('a parked track whose file is already in the library goes back to verification, not re-download', async () => {
+    seed(['a', 'b']);
+    store.patch('a', { status: 'failed', attempts: 3, finalPath: '/music/Band/Record/01 - Song a.mp3' });
+    store.patch('b', { status: 'failed', attempts: 3 });
+    expect(store.retryFailed()).toBe(2);
+    expect(store.getTrack('a')!.status).toBe('imported');
+    expect(store.getTrack('a')!.verifyTries).toBe(0);
+    expect(store.getTrack('b')!.status).toBe('missing');
   });
 
   it('keeps an imported track pending while Plex has not indexed it, then fails after the limit', async () => {
