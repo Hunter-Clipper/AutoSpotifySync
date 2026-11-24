@@ -144,3 +144,36 @@ describe('PlexClient playlist writes', () => {
     expect(calls[0]!.searchParams.get('playlistType')).toBe('audio');
   });
 });
+
+describe('PlexClient.scan', () => {
+  function methods(handler: (method: string, u: URL) => number) {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', async (input: URL | string, init?: RequestInit) => {
+      const u = new URL(input.toString());
+      const method = init?.method ?? 'GET';
+      seen.push(`${method} ${u.pathname}${u.searchParams.get('path') ? ' path=' + u.searchParams.get('path') : ''}`);
+      return new Response('', { status: handler(method, u) });
+    });
+    return seen;
+  }
+
+  it('uses the documented POST with the folder path', async () => {
+    const seen = methods(() => 200);
+    await client().scan(lib, '/data/Music/BØRNS/Album');
+    expect(seen).toEqual(['POST /library/sections/7/refresh path=/data/Music/BØRNS/Album']);
+  });
+
+  it('falls back to GET when the server rejects POST', async () => {
+    const seen = methods((m) => (m === 'POST' ? 405 : 200));
+    await client().scan(lib, '/data/Music/X');
+    expect(seen).toEqual(['POST /library/sections/7/refresh path=/data/Music/X', 'GET /library/sections/7/refresh path=/data/Music/X']);
+  });
+
+  it('does not retry on other errors, and scans the whole section without a path', async () => {
+    methods(() => 401);
+    await expect(client().scan(lib)).rejects.toThrow(/401/);
+    const seen = methods(() => 200);
+    await client().scan(lib);
+    expect(seen).toEqual(['POST /library/sections/7/refresh']);
+  });
+});

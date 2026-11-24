@@ -38,7 +38,7 @@ export class PlexClient implements PlexPlaylistApi {
     return (await res.json()) as T;
   }
 
-  private async send(method: 'POST' | 'PUT' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<unknown> {
+  private async send(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<unknown> {
     const url = new URL(path, this.baseUrl.endsWith('/') ? this.baseUrl : this.baseUrl + '/');
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     const res = await fetch(url, {
@@ -130,12 +130,19 @@ export class PlexClient implements PlexPlaylistApi {
     return library.Location?.[0]?.path ?? null;
   }
 
-  /** Ask Plex to scan one folder (path as Plex sees it), or the whole section if none given. */
+  /**
+   * Ask Plex to scan one folder (path as Plex sees it), or the whole section if none given.
+   * Plex's current API documents POST for this; older servers only accept GET, so fall back on 404/405.
+   */
   async scan(library: PlexDirectory, plexPath?: string): Promise<void> {
-    const url = new URL(`library/sections/${library.key}/refresh`, this.baseUrl.endsWith('/') ? this.baseUrl : this.baseUrl + '/');
-    if (plexPath) url.searchParams.set('path', plexPath);
-    const res = await fetch(url, { headers: { 'X-Plex-Token': this.token }, signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) throw new Error(`Plex scan request failed: HTTP ${res.status}`);
+    const path = `library/sections/${library.key}/refresh`;
+    const params: Record<string, string> = plexPath ? { path: plexPath } : {};
+    try {
+      await this.send('POST', path, params);
+    } catch (err) {
+      if (!/HTTP (404|405)\b/.test(String(err))) throw err;
+      await this.send('GET', path, params);
+    }
   }
 
   /**
