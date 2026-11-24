@@ -90,3 +90,57 @@ describe('PlexClient.rootOf', () => {
     expect(PlexClient.rootOf({ ...lib, Location: undefined })).toBeNull();
   });
 });
+
+describe('PlexClient playlist writes', () => {
+  const uri = (u: URL) => u.searchParams.get('uri')!;
+
+  it('creates a playlist, chunking large lists across create + append calls', async () => {
+    const created: URL[] = [];
+    vi.stubGlobal('fetch', async (input: URL | string, init?: RequestInit) => {
+      const u = new URL(input.toString());
+      calls.push(u);
+      const method = init?.method ?? 'GET';
+      if (u.pathname === '/') return new Response(JSON.stringify({ MediaContainer: { machineIdentifier: 'MACHINE' } }));
+      if (method === 'POST' && u.pathname === '/playlists') {
+        created.push(u);
+        return new Response(JSON.stringify({ MediaContainer: { Metadata: [{ ratingKey: '777' }] } }));
+      }
+      if (method === 'PUT' && u.pathname === '/playlists/777/items') return new Response('');
+      return new Response('unexpected', { status: 500 });
+    });
+    const keys = Array.from({ length: 250 }, (_, i) => String(1000 + i));
+    const id = await client().createPlaylist('EDM 🎧', keys);
+    expect(id).toBe('777');
+    expect(created[0]!.searchParams.get('title')).toBe('EDM 🎧');
+    expect(created[0]!.searchParams.get('type')).toBe('audio');
+    expect(created[0]!.searchParams.get('smart')).toBe('0');
+    expect(uri(created[0]!)).toBe(`server://MACHINE/com.plexapp.plugins.library/library/metadata/${keys.slice(0, 100).join(',')}`);
+    const puts = calls.filter((u) => u.pathname === '/playlists/777/items');
+    expect(puts).toHaveLength(2);
+    expect(uri(puts[0]!).endsWith(keys.slice(100, 200).join(','))).toBe(true);
+    expect(uri(puts[1]!).endsWith(keys.slice(200).join(','))).toBe(true);
+    expect(calls.every((u) => !u.toString().includes('TOKEN'))).toBe(true);
+  });
+
+  it('replaceItems clears first, then appends in order', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', async (input: URL | string, init?: RequestInit) => {
+      const u = new URL(input.toString());
+      if (u.pathname === '/') return new Response(JSON.stringify({ MediaContainer: { machineIdentifier: 'M' } }));
+      seen.push(`${init?.method} ${u.pathname}`);
+      return new Response('');
+    });
+    await client().replaceItems('5', ['1', '2']);
+    expect(seen).toEqual(['DELETE /playlists/5/items', 'PUT /playlists/5/items']);
+  });
+
+  it('lists audio playlists and reads items with paging', async () => {
+    stub((u) => {
+      if (u.pathname === '/playlists') return container([{ ratingKey: '5', title: 'EDM' }]);
+      return container([{ ratingKey: '10' }, { ratingKey: '11' }]);
+    });
+    expect(await client().listPlaylists()).toEqual([{ id: '5', title: 'EDM' }]);
+    expect(await client().playlistItems('5')).toEqual(['10', '11']);
+    expect(calls[0]!.searchParams.get('playlistType')).toBe('audio');
+  });
+});

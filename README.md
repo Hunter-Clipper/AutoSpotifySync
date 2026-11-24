@@ -19,6 +19,13 @@ Spotify/Plex/downloader. Expect rough edges and please report them.
 5. **Verify**: trigger a Plex scan of just that folder and confirm Plex lists the track.
    Only then is it marked complete. Failures retry with backoff, then park for review.
 
+6. **Playlists** (opt-in, `PLEX_SYNC_PLAYLISTS=true`): mirror each Spotify playlist and Liked
+   Songs into a Plex playlist with the **same name**, containing the tracks you have, in
+   Spotify's order. It fills in as downloads complete. One way only (Spotify to Plex): edits to
+   the Plex copy are overwritten. Only playlists this tool created are ever changed or deleted;
+   a same-named playlist you made yourself is left alone. Saved albums are not turned into
+   playlists. Run it on demand with the `playlists` command.
+
 **Safe by default:** `AUTO_DOWNLOAD=false` and `DRY_RUN=true`. To go live set
 `AUTO_DOWNLOAD=true` **and** `DRY_RUN=false`. A dry run logs exactly what would be downloaded.
 
@@ -60,7 +67,7 @@ docker run --rm --env-file .env -v /path/to/appdata/autospotifysync:/config auto
 The container runs as `99:100` (Unraid `nobody:users`); `/config` must be writable by it.
 
 Commands: `daemon` (container default), `run` (one full pass), `sync`, `status`,
-`missing`, `review`, `failed`, `retry [trackId]`, `auth`. Run any of them by appending the
+`missing`, `review`, `failed`, `retry [trackId]`, `playlists`, `auth`. Run any of them by appending the
 command to the `docker run` line.
 
 Unraid: a template is in [`unraid/autospotifysync.xml`](unraid/autospotifysync.xml). The

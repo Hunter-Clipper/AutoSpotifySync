@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { runAuth } from './auth.js';
-import { runCycle, runDaemon } from './daemon.js';
+import { runCycle, runDaemon, runPlaylistSync } from './daemon.js';
 import { loadConfig } from './config.js';
 import { Store } from './db.js';
 import { createLogger } from './logger.js';
@@ -45,6 +45,16 @@ program
   .command('daemon')
   .description('Run `run` forever every SYNC_INTERVAL (the container default)')
   .action(() => withApp(({ cfg, store, log }) => runDaemon(cfg, store, log)));
+
+program
+  .command('playlists')
+  .description('Mirror Spotify playlists and Liked Songs into Plex playlists now (needs PLEX_SYNC_PLAYLISTS=true; honors DRY_RUN)')
+  .action(() =>
+    withApp(async ({ cfg, store, log }) => {
+      if (!cfg.PLEX_SYNC_PLAYLISTS) throw new Error('Set PLEX_SYNC_PLAYLISTS=true to enable playlist syncing');
+      await runPlaylistSync(cfg, store, log);
+    }),
+  );
 
 program
   .command('failed')

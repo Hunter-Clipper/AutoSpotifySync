@@ -19,6 +19,8 @@ const schema = z.object({
   PLEX_URL: z.string().url().optional(),
   PLEX_TOKEN: z.string().optional(),
   PLEX_MUSIC_LIBRARY: z.string().optional(),
+  PLEX_SYNC_PLAYLISTS: bool(false),
+  PLEX_PLAYLIST_DELETE_REMOVED: bool(true),
 
   // Downloader (used from milestone 4)
   DOWNLOADER_URL: z.string().url().optional(),

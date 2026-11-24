@@ -11,7 +11,20 @@ interface PlexMeta {
   parentTitle?: string;
 }
 
-export class PlexClient {
+export interface PlexPlaylistApi {
+  listPlaylists(): Promise<{ id: string; title: string }[]>;
+  playlistItems(id: string): Promise<string[]>;
+  createPlaylist(title: string, keys: string[]): Promise<string>;
+  replaceItems(id: string, keys: string[]): Promise<void>;
+  renamePlaylist(id: string, title: string): Promise<void>;
+  deletePlaylist(id: string): Promise<void>;
+}
+
+const PLAYLIST_CHUNK = 100;
+
+export class PlexClient implements PlexPlaylistApi {
+  private machine?: string;
+
   constructor(private baseUrl: string, private token: string, private log: Logger) {}
 
   private async get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
@@ -23,6 +36,93 @@ export class PlexClient {
     });
     if (!res.ok) throw new Error(`Plex HTTP ${res.status} for ${path}`);
     return (await res.json()) as T;
+  }
+
+  private async send(method: 'POST' | 'PUT' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<unknown> {
+    const url = new URL(path, this.baseUrl.endsWith('/') ? this.baseUrl : this.baseUrl + '/');
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const res = await fetch(url, {
+      method,
+      headers: { Accept: 'application/json', 'X-Plex-Token': this.token },
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) throw new Error(`Plex HTTP ${res.status} for ${method} ${path}`);
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async machineId(): Promise<string> {
+    if (!this.machine) {
+      const root = await this.get<{ MediaContainer: { machineIdentifier?: string } }>('');
+      const id = root.MediaContainer.machineIdentifier;
+      if (!id) throw new Error('Plex did not report a machineIdentifier');
+      this.machine = id;
+    }
+    return this.machine;
+  }
+
+  private async itemsUri(keys: string[]): Promise<string> {
+    return `server://${await this.machineId()}/com.plexapp.plugins.library/library/metadata/${keys.join(',')}`;
+  }
+
+  async listPlaylists(): Promise<{ id: string; title: string }[]> {
+    const data = await this.get<{ MediaContainer: { Metadata?: { ratingKey: string; title: string }[] } }>(
+      'playlists',
+      { playlistType: 'audio' },
+    );
+    return (data.MediaContainer.Metadata ?? []).map((m) => ({ id: m.ratingKey, title: m.title }));
+  }
+
+  async playlistItems(id: string): Promise<string[]> {
+    const out: string[] = [];
+    const size = 1000;
+    for (let start = 0; ; start += size) {
+      const data = await this.get<{ MediaContainer: { Metadata?: { ratingKey: string }[] } }>(
+        `playlists/${id}/items`,
+        { 'X-Plex-Container-Start': String(start), 'X-Plex-Container-Size': String(size) },
+      );
+      const items = data.MediaContainer.Metadata ?? [];
+      out.push(...items.map((m) => m.ratingKey));
+      if (items.length < size) return out;
+    }
+  }
+
+  /** Create a playlist (first chunk in the create call, the rest appended in chunks). Returns its id. */
+  async createPlaylist(title: string, keys: string[]): Promise<string> {
+    const res = (await this.send('POST', 'playlists', {
+      type: 'audio',
+      title,
+      smart: '0',
+      uri: await this.itemsUri(keys.slice(0, PLAYLIST_CHUNK)),
+    })) as { MediaContainer?: { Metadata?: { ratingKey: string }[] } } | undefined;
+    const id = res?.MediaContainer?.Metadata?.[0]?.ratingKey;
+    if (!id) throw new Error('Plex did not return the new playlist id');
+    await this.addItems(id, keys.slice(PLAYLIST_CHUNK));
+    return id;
+  }
+
+  private async addItems(id: string, keys: string[]): Promise<void> {
+    for (let i = 0; i < keys.length; i += PLAYLIST_CHUNK) {
+      await this.send('PUT', `playlists/${id}/items`, { uri: await this.itemsUri(keys.slice(i, i + PLAYLIST_CHUNK)) });
+    }
+  }
+
+  /** Empty the playlist and refill it in order (keeps the playlist id and any artwork). */
+  async replaceItems(id: string, keys: string[]): Promise<void> {
+    await this.send('DELETE', `playlists/${id}/items`);
+    await this.addItems(id, keys);
+  }
+
+  async renamePlaylist(id: string, title: string): Promise<void> {
+    await this.send('PUT', `playlists/${id}`, { title });
+  }
+
+  async deletePlaylist(id: string): Promise<void> {
+    await this.send('DELETE', `playlists/${id}`);
   }
 
   /** Folder Plex itself uses for this library (may differ from our /music mount). */

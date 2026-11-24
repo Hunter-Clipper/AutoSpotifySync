@@ -39,6 +39,12 @@ const MIGRATIONS: string[] = [
    ALTER TABLE tracks ADD COLUMN final_path TEXT;
    ALTER TABLE tracks ADD COLUMN next_attempt_at TEXT;
    ALTER TABLE tracks ADD COLUMN verify_tries INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE plex_playlists (
+     collection_id TEXT PRIMARY KEY,   -- no FK: we still need the row after Spotify drops the collection
+     plex_playlist_id TEXT NOT NULL,
+     title TEXT NOT NULL,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );`,
 ];
 
 /** Statuses that a Plex re-check is allowed to overwrite. Later pipeline states are left alone. */
@@ -262,6 +268,49 @@ export class Store {
                   updated_at=datetime('now') WHERE status='failed'`;
     const res = id ? this.db.prepare(`${base} AND id = ?`).run(id) : this.db.prepare(base).run();
     return Number(res.changes);
+  }
+
+  /** Collections that become Plex playlists (everything except albums, which Plex already shows). */
+  playlistCollections(): { id: string; name: string; kind: string }[] {
+    return this.db
+      .prepare(
+        `SELECT id, name, kind FROM collections
+         WHERE kind IN ('playlist-own','playlist-followed','public-playlist','liked') ORDER BY name`,
+      )
+      .all() as { id: string; name: string; kind: string }[];
+  }
+
+  /** Plex rating keys for a collection's tracks that are in Plex, in Spotify's order. */
+  plexKeysFor(collectionId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT t.plex_key AS k FROM collection_tracks ct JOIN tracks t ON t.id = ct.track_id
+         WHERE ct.collection_id = ? AND t.status IN ('matched','complete') AND t.plex_key IS NOT NULL
+         ORDER BY ct.position`,
+      )
+      .all(collectionId) as { k: string }[];
+    return rows.map((r) => r.k);
+  }
+
+  plexPlaylists(): Map<string, { plexId: string; title: string }> {
+    const rows = this.db
+      .prepare('SELECT collection_id, plex_playlist_id, title FROM plex_playlists')
+      .all() as { collection_id: string; plex_playlist_id: string; title: string }[];
+    return new Map(rows.map((r) => [r.collection_id, { plexId: r.plex_playlist_id, title: r.title }]));
+  }
+
+  setPlexPlaylist(collectionId: string, plexId: string, title: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO plex_playlists (collection_id, plex_playlist_id, title) VALUES (?, ?, ?)
+         ON CONFLICT(collection_id) DO UPDATE SET plex_playlist_id=excluded.plex_playlist_id,
+           title=excluded.title, updated_at=datetime('now')`,
+      )
+      .run(collectionId, plexId, title);
+  }
+
+  deletePlexPlaylist(collectionId: string): void {
+    this.db.prepare('DELETE FROM plex_playlists WHERE collection_id = ?').run(collectionId);
   }
 
   close(): void {
