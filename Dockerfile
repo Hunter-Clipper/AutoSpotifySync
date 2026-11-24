@@ -23,4 +23,4 @@ RUN mkdir -p /config && chown 99:100 /config
 USER 99:100
 VOLUME /config
 ENTRYPOINT ["node", "dist/cli.js"]
-CMD ["--help"]
+CMD ["daemon"]

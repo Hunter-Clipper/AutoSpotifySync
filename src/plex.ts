@@ -1,7 +1,7 @@
 import type { Logger } from './logger.js';
 import type { PlexTrack } from './types.js';
 
-interface PlexDirectory { key: string; title: string; type: string }
+export interface PlexDirectory { key: string; title: string; type: string; Location?: { path: string }[] }
 interface PlexMeta {
   ratingKey: string;
   title: string;
@@ -22,6 +22,28 @@ export class PlexClient {
     });
     if (!res.ok) throw new Error(`Plex HTTP ${res.status} for ${path}`);
     return (await res.json()) as T;
+  }
+
+  /** Folder Plex itself uses for this library (may differ from our /music mount). */
+  static rootOf(library: PlexDirectory): string | null {
+    return library.Location?.[0]?.path ?? null;
+  }
+
+  /** Ask Plex to scan one folder (path as Plex sees it), or the whole section if none given. */
+  async scan(library: PlexDirectory, plexPath?: string): Promise<void> {
+    const url = new URL(`library/sections/${library.key}/refresh`, this.baseUrl.endsWith('/') ? this.baseUrl : this.baseUrl + '/');
+    if (plexPath) url.searchParams.set('path', plexPath);
+    const res = await fetch(url, { headers: { 'X-Plex-Token': this.token }, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`Plex scan request failed: HTTP ${res.status}`);
+  }
+
+  /** Search the library's tracks by title text. */
+  async searchTracks(library: PlexDirectory, query: string): Promise<PlexTrack[]> {
+    const data = await this.get<{ MediaContainer: { Metadata?: PlexMeta[] } }>(
+      `library/sections/${library.key}/search`,
+      { type: '10', query },
+    );
+    return (data.MediaContainer.Metadata ?? []).map(toPlexTrack);
   }
 
   /** Resolve the music library: by name if given, else the only music library. */
@@ -47,18 +69,20 @@ export class PlexClient {
         { type: '10', 'X-Plex-Container-Start': String(start), 'X-Plex-Container-Size': String(size) },
       );
       const items = data.MediaContainer.Metadata ?? [];
-      for (const m of items) {
-        out.push({
-          key: m.ratingKey,
-          title: m.title,
-          artist: m.grandparentTitle ?? '',
-          trackArtist: m.originalTitle ?? null,
-          album: m.parentTitle ?? '',
-        });
-      }
+      for (const m of items) out.push(toPlexTrack(m));
       if (items.length < size) break;
     }
     this.log.info('Loaded Plex tracks', { library: library.title, count: out.length });
     return out;
   }
+}
+
+function toPlexTrack(m: PlexMeta): PlexTrack {
+  return {
+    key: m.ratingKey,
+    title: m.title,
+    artist: m.grandparentTitle ?? '',
+    trackArtist: m.originalTitle ?? null,
+    album: m.parentTitle ?? '',
+  };
 }

@@ -43,7 +43,10 @@ const schema = z.object({
     .default('6h'),
   NOTIFY_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  NOTIFY_ON: z.enum(['always', 'changes']).default('changes'),
   CONFIG_DIR: z.string().default('./config'),
+  MUSIC_DIR: z.string().default('/music'),
+  STAGING_DIR: z.string().optional(),
 });
 
 export type Config = ReturnType<typeof parse>;

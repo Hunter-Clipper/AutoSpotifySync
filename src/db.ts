@@ -34,6 +34,11 @@ const MIGRATIONS: string[] = [
      PRIMARY KEY (collection_id, position)
    );
    CREATE INDEX idx_ct_track ON collection_tracks(track_id);`,
+  `ALTER TABLE tracks ADD COLUMN job_id TEXT;
+   ALTER TABLE tracks ADD COLUMN staged_path TEXT;
+   ALTER TABLE tracks ADD COLUMN final_path TEXT;
+   ALTER TABLE tracks ADD COLUMN next_attempt_at TEXT;
+   ALTER TABLE tracks ADD COLUMN verify_tries INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 /** Statuses that a Plex re-check is allowed to overwrite. Later pipeline states are left alone. */
@@ -44,6 +49,32 @@ export interface TrackRow extends TrackRec {
   matchConfidence: number | null;
   plexKey: string | null;
   lastError: string | null;
+}
+
+/** Pipeline bookkeeping for a track. */
+export interface TrackState {
+  status: string;
+  attempts: number;
+  jobId: string | null;
+  stagedPath: string | null;
+  finalPath: string | null;
+  nextAttemptAt: string | null;
+  verifyTries: number;
+  lastError: string | null;
+  plexKey: string | null;
+}
+export type FullTrack = TrackRec & TrackState;
+export type StatePatch = Partial<TrackState>;
+
+const PATCH_COLUMNS: Record<keyof TrackState, string> = {
+  status: 'status', attempts: 'attempts', jobId: 'job_id', stagedPath: 'staged_path',
+  finalPath: 'final_path', nextAttemptAt: 'next_attempt_at', verifyTries: 'verify_tries',
+  lastError: 'last_error', plexKey: 'plex_key',
+};
+
+interface RawFull extends RawRow {
+  attempts: number; job_id: string | null; staged_path: string | null; final_path: string | null;
+  next_attempt_at: string | null; verify_tries: number;
 }
 
 interface RawRow {
@@ -168,6 +199,69 @@ export class Store {
       plexKey: r.plex_key,
       lastError: r.last_error,
     }));
+  }
+
+  private toFull(r: RawFull): FullTrack {
+    return {
+      ...toRec(r),
+      status: r.status, attempts: r.attempts, jobId: r.job_id, stagedPath: r.staged_path,
+      finalPath: r.final_path, nextAttemptAt: r.next_attempt_at, verifyTries: r.verify_tries,
+      lastError: r.last_error, plexKey: r.plex_key,
+    };
+  }
+
+  getTrack(id: string): FullTrack | undefined {
+    const r = this.db.prepare('SELECT * FROM tracks WHERE id = ?').get(id) as unknown as RawFull | undefined;
+    return r ? this.toFull(r) : undefined;
+  }
+
+  /** Update pipeline fields. Only whitelisted columns can be written. */
+  patch(id: string, p: StatePatch): void {
+    const entries = Object.entries(p) as [keyof TrackState, unknown][];
+    if (entries.length === 0) return;
+    const sets = entries.map(([k]) => `${PATCH_COLUMNS[k]} = ?`).join(', ');
+    this.db
+      .prepare(`UPDATE tracks SET ${sets}, updated_at = datetime('now') WHERE id = ?`)
+      .run(...(entries.map(([, v]) => v ?? null) as SQLInputValue[]), id);
+  }
+
+  /** Tracks mid-pipeline (survive restarts): downloading, downloaded, imported. */
+  resumable(): FullTrack[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM tracks WHERE status IN ('downloading','downloaded','imported') ORDER BY updated_at`)
+      .all() as unknown as RawFull[];
+    return rows.map((r) => this.toFull(r));
+  }
+
+  /** Missing tracks whose backoff has elapsed, oldest first. limit 0 = no limit. */
+  eligibleMissing(limit: number, nowIso = new Date().toISOString()): FullTrack[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM tracks WHERE status = 'missing' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         AND id IN (SELECT track_id FROM collection_tracks) ORDER BY first_seen, id LIMIT ?`,
+      )
+      .all(nowIso, (limit > 0 ? limit : -1) as SQLInputValue) as unknown as RawFull[];
+    return rows.map((r) => this.toFull(r));
+  }
+
+  /** Failed tracks past their cooldown go back to missing with a clean slate. */
+  reviveFailed(nowIso = new Date().toISOString()): number {
+    return Number(
+      this.db
+        .prepare(
+          `UPDATE tracks SET status='missing', attempts=0, next_attempt_at=NULL, updated_at=datetime('now')
+           WHERE status='failed' AND next_attempt_at IS NOT NULL AND next_attempt_at <= ?`,
+        )
+        .run(nowIso).changes,
+    );
+  }
+
+  /** Manual retry: put failed track(s) (one id, or all) back in the queue immediately. */
+  retryFailed(id?: string): number {
+    const base = `UPDATE tracks SET status='missing', attempts=0, next_attempt_at=NULL, last_error=NULL,
+                  updated_at=datetime('now') WHERE status='failed'`;
+    const res = id ? this.db.prepare(`${base} AND id = ?`).run(id) : this.db.prepare(base).run();
+    return Number(res.changes);
   }
 
   close(): void {
