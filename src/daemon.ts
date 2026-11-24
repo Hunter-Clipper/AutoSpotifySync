@@ -34,7 +34,9 @@ export async function runPlaylistSync(cfg: Config, store: Store, log: Logger): P
   if (!cfg.PLEX_SYNC_PLAYLISTS) return undefined;
   if (!cfg.PLEX_URL || !cfg.PLEX_TOKEN) throw new Error('PLEX_SYNC_PLAYLISTS needs PLEX_URL and PLEX_TOKEN');
   const plex = new PlexClient(cfg.PLEX_URL, cfg.PLEX_TOKEN, log);
-  return syncPlexPlaylists(store, plex, log, { dryRun: cfg.DRY_RUN, deleteRemoved: cfg.PLEX_PLAYLIST_DELETE_REMOVED });
+  // Preview if either the global DRY_RUN or the playlist-only preview switch is on.
+  const dryRun = cfg.DRY_RUN || cfg.PLEX_PLAYLISTS_DRY_RUN;
+  return syncPlexPlaylists(store, plex, log, { dryRun, deleteRemoved: cfg.PLEX_PLAYLIST_DELETE_REMOVED });
 }
 
 /** One full pass: sync Spotify, check Plex, then download/import/verify what is missing. */

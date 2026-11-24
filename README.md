@@ -23,7 +23,8 @@ Spotify/Plex/downloader. Expect rough edges and please report them.
    Songs into a Plex playlist with the **same name**, containing the tracks you have, in
    Spotify's order. It fills in as downloads complete. One way only (Spotify to Plex): edits to
    the Plex copy are overwritten. Only playlists this tool created are ever changed or deleted;
-   a same-named playlist you made yourself is left alone. Saved albums are not turned into
+   a same-named playlist you made yourself is left alone. Set `PLEX_PLAYLISTS_DRY_RUN=true` to
+   preview what it would do (logged, nothing changed) while downloads stay live. Saved albums are not turned into
    playlists. Run it on demand with the `playlists` command.
 
 **Safe by default:** `AUTO_DOWNLOAD=false` and `DRY_RUN=true`. To go live set
