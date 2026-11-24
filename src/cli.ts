@@ -2,7 +2,7 @@
 import { Command } from 'commander';
 import { runAuth } from './auth.js';
 import { runCycle, runDaemon, runPlaylistSync } from './daemon.js';
-import { loadConfig } from './config.js';
+import { configWarnings, loadConfig } from './config.js';
 import { Store } from './db.js';
 import { createLogger } from './logger.js';
 import { runSync } from './sync.js';
@@ -14,6 +14,7 @@ const program = new Command('spotify-sync').description(
 async function withApp<T>(fn: (a: { cfg: ReturnType<typeof loadConfig>; store: Store; log: ReturnType<typeof createLogger> }) => Promise<T> | T): Promise<T> {
   const cfg = loadConfig();
   const log = createLogger(cfg.LOG_LEVEL);
+  for (const w of configWarnings()) log.warn(w);
   const store = new Store(cfg.CONFIG_DIR);
   try {
     return await fn({ cfg, store, log });

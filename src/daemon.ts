@@ -1,4 +1,4 @@
-import type { Config } from './config.js';
+import { playlistMode, type Config } from './config.js';
 import type { Store } from './db.js';
 import type { Logger } from './logger.js';
 import { notify } from './notify.js';
@@ -7,6 +7,7 @@ import { syncPlexPlaylists, type PlaylistSummary } from './plexPlaylists.js';
 import { runDownloads, type DownloadSummary } from './pipeline.js';
 import { runSync, type SyncSummary } from './sync.js';
 import { parseInterval, sleep } from './util.js';
+import { VERSION } from './version.js';
 
 export interface CycleResult { sync: SyncSummary; downloads: DownloadSummary; playlists?: PlaylistSummary }
 
@@ -31,7 +32,10 @@ export function summarize(r: CycleResult, counts: Record<string, number>): strin
 
 /** Mirror Spotify playlists into Plex when PLEX_SYNC_PLAYLISTS is on. Honors DRY_RUN. */
 export async function runPlaylistSync(cfg: Config, store: Store, log: Logger): Promise<PlaylistSummary | undefined> {
-  if (!cfg.PLEX_SYNC_PLAYLISTS) return undefined;
+  if (!cfg.PLEX_SYNC_PLAYLISTS) {
+    log.info('Plex playlist sync is off (set PLEX_SYNC_PLAYLISTS=true to enable)');
+    return undefined;
+  }
   if (!cfg.PLEX_URL || !cfg.PLEX_TOKEN) throw new Error('PLEX_SYNC_PLAYLISTS needs PLEX_URL and PLEX_TOKEN');
   const plex = new PlexClient(cfg.PLEX_URL, cfg.PLEX_TOKEN, log);
   // Preview if either the global DRY_RUN or the playlist-only preview switch is on.
@@ -66,7 +70,12 @@ export async function runDaemon(cfg: Config, store: Store, log: Logger): Promise
     });
   }
   log.info('Daemon started', {
-    interval: cfg.SYNC_INTERVAL, autoDownload: cfg.AUTO_DOWNLOAD, dryRun: cfg.DRY_RUN,
+    version: VERSION,
+    interval: cfg.SYNC_INTERVAL,
+    autoDownload: cfg.AUTO_DOWNLOAD,
+    dryRun: cfg.DRY_RUN,
+    playlists: playlistMode(cfg),
+    durationToleranceSec: cfg.DURATION_TOLERANCE_SEC,
   });
   while (!stop.signal.aborted) {
     try {

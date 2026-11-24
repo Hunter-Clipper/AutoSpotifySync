@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { registerSecret } from './logger.js';
+import { similarity } from './normalize.js';
 
 const bool = (def: boolean) =>
   z
@@ -55,11 +56,37 @@ const schema = z.object({
 export type Config = ReturnType<typeof parse>;
 
 function parse(env: NodeJS.ProcessEnv) {
-  // Unraid templates pass unset fields as empty strings: treat them as unset.
+  // Unraid templates pass unset fields as empty strings (treat as unset), and a stray space
+  // pasted into a name or value is easy to miss, so trim both.
   const cleaned = Object.fromEntries(
-    Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== ''),
+    Object.entries(env)
+      .map(([k, v]) => [k.trim(), v?.trim()] as const)
+      .filter(([, v]) => v !== undefined && v !== ''),
   );
   return schema.parse(cleaned);
+}
+
+const KNOWN_SETTINGS = Object.keys(schema.shape);
+/** Prefixes that mark an env var as one of ours, so unrelated variables (PATH, HOME...) are not flagged. */
+const OUR_PREFIX = /^(SPOTIFY|PLEX|DOWNLOADER|DOWNLOAD|MATCH|RETRY|SYNC|NOTIFY|MAX|DRY|AUTO|DURATION|MUSIC|STAGING|CONFIG|LOG)_/;
+
+/** Human-readable problems with the environment that would otherwise fail silently. */
+export function configWarnings(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = [];
+  for (const raw of Object.keys(env)) {
+    const name = raw.trim();
+    if (name !== raw) out.push(`Setting name "${raw}" has stray whitespace; using "${name}". Remove the space in the variable's Key.`);
+    if (KNOWN_SETTINGS.includes(name) || !OUR_PREFIX.test(name)) continue;
+    const best = KNOWN_SETTINGS.map((k) => ({ k, score: similarity(name.toLowerCase(), k.toLowerCase()) })).sort((a, b) => b.score - a.score)[0];
+    out.push(`Ignoring unrecognized setting ${name}${best && best.score >= 0.6 ? ` (did you mean ${best.k}?)` : ''}`);
+  }
+  return out;
+}
+
+/** playlists: off, preview (logs only) or on. */
+export function playlistMode(cfg: Pick<Config, 'PLEX_SYNC_PLAYLISTS' | 'DRY_RUN' | 'PLEX_PLAYLISTS_DRY_RUN'>): 'off' | 'preview' | 'on' {
+  if (!cfg.PLEX_SYNC_PLAYLISTS) return 'off';
+  return cfg.DRY_RUN || cfg.PLEX_PLAYLISTS_DRY_RUN ? 'preview' : 'on';
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
