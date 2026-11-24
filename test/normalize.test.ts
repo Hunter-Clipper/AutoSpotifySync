@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeArtist, normalizeTitle, similarity } from '../src/normalize.js';
+import { normalizeArtist, normalizeTitle, similarity, versionTags } from '../src/normalize.js';
 
 describe('normalizeTitle', () => {
   it.each([
@@ -34,5 +34,16 @@ describe('similarity', () => {
   });
   it('ranks near strings above distant ones', () => {
     expect(similarity('hello world', 'hello wrld')).toBeGreaterThan(similarity('hello world', 'goodbye'));
+  });
+});
+
+describe('versionTags', () => {
+  it('finds version words, order-independent and de-duplicated', () => {
+    expect(versionTags(normalizeTitle('Song (Bass Boosted) - Oliver Remix'))).toBe('bass boosted|remix');
+    expect(versionTags(normalizeTitle('Song - Remix (Remix)'))).toBe('remix');
+  });
+  it('is empty for ordinary titles, including remasters and features', () => {
+    expect(versionTags(normalizeTitle('Come Together - Remastered 2009'))).toBe('');
+    expect(versionTags(normalizeTitle('Under Pressure (feat. David Bowie)'))).toBe('');
   });
 });

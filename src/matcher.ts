@@ -1,7 +1,7 @@
-import { normalizeArtist, normalizeTitle, similarity } from './normalize.js';
+import { normalizeArtist, normalizeTitle, similarity, versionTags } from './normalize.js';
 import type { MatchStatus, PlexTrack, TrackRec } from './types.js';
 
-interface Entry { plex: PlexTrack; title: string; artists: string[]; album: string }
+interface Entry { plex: PlexTrack; title: string; versions: string; artists: string[]; album: string }
 
 export interface MatchResult { status: MatchStatus; confidence: number; plexKey: string | null }
 
@@ -9,6 +9,8 @@ export interface MatchOptions { minConfidence: number; strictAlbum: boolean }
 
 /** Below this a candidate is not even worth a human look. */
 const REVIEW_FLOOR = 0.7;
+/** When a title carries a version word (remix, live...), the rest must match almost exactly. */
+const VERSIONED_TITLE_SIM = 0.92;
 /** Candidates whose artist is less similar than this are never the same song. */
 const MIN_ARTIST_SIM = 0.6;
 
@@ -21,7 +23,8 @@ export class PlexIndex {
       const artists = [plex.artist, plex.trackArtist]
         .filter((a): a is string => !!a)
         .map(normalizeArtist);
-      const entry: Entry = { plex, title: normalizeTitle(plex.title), artists, album: normalizeTitle(plex.album) };
+      const title = normalizeTitle(plex.title);
+      const entry: Entry = { plex, title, versions: versionTags(title), artists, album: normalizeTitle(plex.album) };
       push(this.byTitle, entry.title, entry);
       for (const a of new Set(artists)) push(this.byArtist, a, entry);
     }
@@ -39,11 +42,16 @@ export class PlexIndex {
     const title = normalizeTitle(track.title);
     const album = normalizeTitle(track.album);
     const artists = track.artists.map(normalizeArtist);
+    const versions = versionTags(title);
     let best: MatchResult = { status: 'missing', confidence: 0, plexKey: null };
 
     for (const e of this.candidates(track)) {
       if (opts.strictAlbum && similarity(album, e.album) < 0.8) continue;
+      // A remix, live cut or bass-boosted edit is not the original song, and vice versa.
+      if (versions !== e.versions) continue;
       const titleSim = similarity(title, e.title);
+      // Same kind of version (e.g. two remixes): different remixers must not match each other.
+      if (versions && titleSim < VERSIONED_TITLE_SIM) continue;
       let artistSim = 0;
       for (const a of artists) for (const b of e.artists) artistSim = Math.max(artistSim, similarity(a, b));
       // The artist is essential: a same-titled song by someone else is a different song.

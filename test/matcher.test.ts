@@ -50,4 +50,37 @@ describe('PlexIndex.match', () => {
     const r = index.match(sp('Come Together', ['The Beatles'], 'Greatest Hits'), { ...opts, strictAlbum: true });
     expect(r.status).toBe('missing');
   });
+
+  describe('version words', () => {
+    const idx = new PlexIndex([
+      plex('Electric Love - Oliver Remix', 'BØRNS', 'Electric Love (Oliver Remix)'),
+      plex('Like this', 'Dj Usman Bhatti'),
+      plex('Halo (Live)', 'Beyoncé'),
+      plex('Song', 'Band'),
+    ]);
+
+    it('the original is not the remix you own (this was stuck in review)', () => {
+      expect(idx.match(sp('Electric Love', ['BØRNS'], 'Dopamine'), opts).status).toBe('missing');
+    });
+    it('the remix is not the original', () => {
+      const i = new PlexIndex([plex('Electric Love', 'BØRNS', 'Dopamine')]);
+      expect(i.match(sp('Electric Love - Oliver Remix', ['BØRNS']), opts).status).toBe('missing');
+    });
+    it('the same remix still matches', () => {
+      expect(idx.match(sp('Electric Love - Oliver Remix', ['BØRNS']), opts).status).toBe('matched');
+    });
+    it('a bass-boosted edit is not the plain song', () => {
+      expect(idx.match(sp('Like this (Bass Boosted)', ['Dj Usman Bhatti']), opts).status).toBe('missing');
+    });
+    it('different remixers do not match each other', () => {
+      expect(idx.match(sp('Electric Love - Zed Remix', ['BØRNS']), opts).status).toBe('missing');
+    });
+    it('live vs studio are different, live vs live match', () => {
+      expect(idx.match(sp('Halo', ['Beyoncé']), opts).status).toBe('missing');
+      expect(idx.match(sp('Halo (Live)', ['Beyoncé']), opts).status).toBe('matched');
+    });
+    it('ordinary titles are unaffected', () => {
+      expect(idx.match(sp('Song - Remastered 2011', ['Band']), opts).status).toBe('matched');
+    });
+  });
 });

@@ -59,3 +59,15 @@ export function similarity(a: string, b: string): number {
   for (const [g, c] of ma) overlap += Math.min(c, mb.get(g) ?? 0);
   return (2 * overlap) / total;
 }
+
+/**
+ * Words that mark a different recording of the same song (remix, live, bass boosted...).
+ * Two titles that differ in these are different songs even when the rest is identical.
+ */
+const VERSION_WORDS =
+  /\b(remix|live|acoustic|instrumental|karaoke|cover|sped up|slowed|reverb|nightcore|bass boosted|extended|demo|mashup|vip|bootleg|rework|flip|a cappella|acapella|orchestral|unplugged|lofi|8 bit)\b/g;
+
+/** Sorted, de-duplicated version words found in an already-normalized title, joined by "|". */
+export function versionTags(normalizedTitle: string): string {
+  return [...new Set(normalizedTitle.match(VERSION_WORDS) ?? [])].sort().join('|');
+}
