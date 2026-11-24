@@ -1,6 +1,6 @@
 {
   "name": "spotilex",
-  "version": "0.0.4-alpha",
+  "version": "0.0.5-alpha",
   "description": "Sync a Spotify library to SQLite, cross-reference it with Plex, and optionally download and import what is missing.",
   "license": "MIT",
   "type": "module",
