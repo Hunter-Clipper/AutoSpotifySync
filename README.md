@@ -15,12 +15,22 @@ reports. Nothing is downloaded or modified in your music library yet.
 ## Spotify access modes
 | Mode | Needs | Sees |
 |---|---|---|
-| Public-only | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_PLAYLIST_URLS` | The listed public playlists and albums |
-| Full library | Above, plus `SPOTIFY_REFRESH_TOKEN` | Your playlists (own and followed), Liked Songs, saved albums |
+| Public-only | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_PLAYLIST_URLS` | Listed **albums** only (see limits) |
+| Full library | Above, plus `SPOTIFY_REFRESH_TOKEN` | Your playlists, Liked Songs, saved albums |
 
 Generating the refresh token with a built-in command is planned. Until then, use any
 standard Spotify authorization-code flow with scopes `user-library-read`,
-`playlist-read-private` and `playlist-read-collaborative`.
+`playlist-read-private` and `playlist-read-collaborative`. Register a redirect URI of the
+form `http://127.0.0.1:PORT/callback` (Spotify does not allow `localhost`).
+
+### Spotify API limits to know about
+Per Spotify's February 2026 API changes (which apply to apps in development mode):
+- Playlist contents are only returned for playlists **you own or collaborate on**. Playlists
+  you merely follow are skipped with a warning.
+- A client-credentials token (no user) cannot read playlist contents, so public-only mode
+  only works for albums.
+- Development-mode apps allow 5 allowlisted users, and the app owner needs Premium.
+- Refresh tokens last about 6 months, then you must generate a new one.
 
 ## Run
 ```bash

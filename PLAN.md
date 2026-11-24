@@ -83,7 +83,8 @@ Sync a Spotify library into SQLite, cross-reference it with a Plex music library
 
 ## Open items
 - **Spotify auth (decided: start with client ID + secret).**
-  - *Public-only mode:* client ID + secret only (client-credentials flow). Syncs the public playlists/albums listed in `SPOTIFY_PLAYLIST_URLS`. It cannot see Liked Songs, saved albums, or private/followed playlists.
+  - *Public-only mode:* client ID + secret only (client-credentials flow). Per Spotify's Feb 2026 API changes it can only read **albums** listed in `SPOTIFY_PLAYLIST_URLS`; playlist contents need a user token. No Liked Songs, saved albums, or private playlists.
+  - *Dev-mode limit:* `/playlists/{id}/items` only returns contents for playlists the user owns or collaborates on, so **followed playlists of other users cannot be synced** (skipped with a warning). Workaround to consider later: user copies them into their own playlist.
   - *Full-library mode:* adds a one-time user login (authorization-code flow) that yields `SPOTIFY_REFRESH_TOKEN`. The ID and secret are used to refresh it. A `spotify-sync auth` CLI command prints the login URL and accepts the pasted redirect URL, then prints the token to put in the env var. Needed for the "everything in my library" scope, with scopes `user-library-read`, `playlist-read-private`, `playlist-read-collaborative`.
   - Build order: public-only first (milestone 2a), full-library second (2b). Add `http://127.0.0.1:<port>/callback` as the redirect URI in the Spotify dashboard.
 - **Plex:** whether track `guid`/ISRC is exposed. We'll fall back to artist+title if not. (Library name is now an env var.)

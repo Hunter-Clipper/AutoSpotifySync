@@ -46,7 +46,15 @@ export class SpotifyClient {
       body,
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) throw new Error(`Spotify token request failed: HTTP ${res.status}`);
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 200);
+      if (detail.includes('invalid_grant')) {
+        throw new Error(
+          'Spotify refresh token is expired or revoked (they last about 6 months). Generate a new SPOTIFY_REFRESH_TOKEN.',
+        );
+      }
+      throw new Error(`Spotify token request failed: HTTP ${res.status} ${detail}`);
+    }
     const json = (await res.json()) as { access_token: string; expires_in: number };
     registerSecret(json.access_token);
     this.cached = { value: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
@@ -98,23 +106,27 @@ export class SpotifyClient {
     };
   }
 
-  /** Playlist entries. Spotify has been renaming /tracks to /items, so try both. */
+  /**
+   * Playlist entries. Spotify's Feb 2026 API change moved this to /items (entries under `item`)
+   * and removed /tracks. We try /items first and fall back to /tracks for older behavior.
+   * In development mode Spotify only returns contents for playlists the user owns or collaborates on.
+   */
   private async playlistTracks(id: string): Promise<TrackRec[]> {
     const collect = async (suffix: string) => {
       const out: TrackRec[] = [];
-      for await (const it of this.pages<{ track?: SpTrack | null; item?: SpTrack | null }>(
-        `/playlists/${id}/${suffix}?limit=100`,
+      for await (const it of this.pages<{ item?: SpTrack | null; track?: SpTrack | null }>(
+        `/playlists/${id}/${suffix}?limit=50`,
       )) {
-        const t = this.toTrack(it.track ?? it.item);
+        const t = this.toTrack(it.item ?? it.track);
         if (t) out.push(t);
       }
       return out;
     };
     try {
-      return await collect('tracks');
+      return await collect('items');
     } catch (err) {
       if (!String(err).includes('HTTP 404')) throw err;
-      return await collect('items');
+      return await collect('tracks');
     }
   }
 
@@ -144,7 +156,10 @@ export class SpotifyClient {
         this.log.info('Fetched', { collection: label });
       } catch (err) {
         snap.failedCollectionIds.push(id);
-        this.log.warn('Skipping collection (fetch failed)', { collection: label, error: err });
+        const hint = String(err).includes('HTTP 403')
+          ? 'Spotify only returns playlist contents for playlists you own or collaborate on'
+          : undefined;
+        this.log.warn('Skipping collection (fetch failed)', { collection: label, error: err, hint });
       }
     };
 
@@ -155,6 +170,9 @@ export class SpotifyClient {
           'Public-only mode (no SPOTIFY_REFRESH_TOKEN) needs SPOTIFY_PLAYLIST_URLS with at least one playlist or album URL.',
         );
       }
+      this.log.warn(
+        'Public-only mode cannot read playlist contents (Spotify requires a user token); albums work, playlists will be skipped',
+      );
       for (const url of urls) {
         const ref = parseSpotifyUrl(url);
         if (!ref) {
