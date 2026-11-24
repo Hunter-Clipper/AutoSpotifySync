@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { runAuth } from './auth.js';
+import { runCycle, runDaemon } from './daemon.js';
 import { loadConfig } from './config.js';
 import { Store } from './db.js';
 import { createLogger } from './logger.js';
@@ -34,6 +35,37 @@ program
   .command('sync')
   .description('Pull the Spotify library and check it against Plex')
   .action(() => withApp(({ cfg, store, log }) => runSync(cfg, store, log).then(() => undefined)));
+
+program
+  .command('run')
+  .description('One full pass: sync, then download/import/verify missing tracks (respects AUTO_DOWNLOAD / DRY_RUN)')
+  .action(() => withApp(({ cfg, store, log }) => runCycle(cfg, store, log).then(() => undefined)));
+
+program
+  .command('daemon')
+  .description('Run `run` forever every SYNC_INTERVAL (the container default)')
+  .action(() => withApp(({ cfg, store, log }) => runDaemon(cfg, store, log)));
+
+program
+  .command('failed')
+  .description('List tracks that failed and are parked')
+  .option('-n, --limit <n>', 'max rows', '200')
+  .option('--json', 'JSON output')
+  .action((o: { limit: string; json?: boolean }) =>
+    withApp(({ store }) => {
+      const rows = store.list('failed', Number(o.limit));
+      if (o.json) return void console.log(JSON.stringify(rows, null, 2));
+      for (const r of rows) console.log(`${r.id}  ${r.artists.join(', ')} - ${r.title}\n    ${r.lastError ?? ''}`);
+      console.log(`\n${rows.length} failed track(s). Use \`retry\` to queue them again.`);
+    }),
+  );
+
+program
+  .command('retry [trackId]')
+  .description('Put failed track(s) back in the queue now (one Spotify track ID, or all)')
+  .action((trackId?: string) =>
+    withApp(({ store }) => console.log(`Re-queued ${store.retryFailed(trackId)} track(s)`)),
+  );
 
 program
   .command('auth')

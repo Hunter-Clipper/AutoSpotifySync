@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>AutoSpotifySync</Name>
+  <Repository>ghcr.io/hunter-clipper/autospotifysync:latest</Repository>
+  <Registry>https://github.com/Hunter-Clipper/AutoSpotifySync/pkgs/container/autospotifysync</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Hunter-Clipper/AutoSpotifySync/issues</Support>
+  <Project>https://github.com/Hunter-Clipper/AutoSpotifySync</Project>
+  <Overview>Syncs your Spotify library to a local database, compares it with your Plex music library, and reports what is missing. Optionally downloads missing tracks through a spotify-downloader API, imports them into your music share and verifies them in Plex. Safe by default: AUTO_DOWNLOAD is off and DRY_RUN is on. First run `auth` once from a console to get a Spotify refresh token (see the project README).</Overview>
+  <Category>MediaApp:Music Tools:</Category>
+  <ExtraParams>--user 99:100</ExtraParams>
+  <PostArgs/>
+  <Config Name="AppData" Target="/config" Default="/mnt/user/appdata/autospotifysync" Mode="rw" Description="Database, logs and download staging" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/autospotifysync</Config>
+  <Config Name="Music library" Target="/music" Default="/mnt/user/Music" Mode="rw" Description="The same music share Plex reads. Imported files are written here." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/Music</Config>
+  <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="From developer.spotify.com/dashboard" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="From developer.spotify.com/dashboard" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Spotify Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Generate once with: docker run --rm -it -e SPOTIFY_CLIENT_ID=... -e SPOTIFY_CLIENT_SECRET=... ghcr.io/hunter-clipper/autospotifysync auth" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Plex URL" Target="PLEX_URL" Default="http://192.168.1.2:32400" Mode="" Description="Your Plex server address" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Plex Token" Target="PLEX_TOKEN" Default="" Mode="" Description="X-Plex-Token" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Plex Music Library" Target="PLEX_MUSIC_LIBRARY" Default="" Mode="" Description="Library name. Leave empty to auto-detect if you only have one music library." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Downloader URL" Target="DOWNLOADER_URL" Default="" Mode="" Description="Base URL of your spotify-downloader, e.g. http://192.168.1.3:8000" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Downloader API Key" Target="DOWNLOADER_API_KEY" Default="" Mode="" Description="The downloader's API_KEY" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Auto download" Target="AUTO_DOWNLOAD" Default="false" Mode="" Description="Master switch for downloading missing tracks" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
+  <Config Name="Dry run" Target="DRY_RUN" Default="true" Mode="" Description="While true, nothing is downloaded or imported; the log shows what would happen. Set false to go live." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
+  <Config Name="Max downloads per run" Target="MAX_DOWNLOADS_PER_RUN" Default="50" Mode="" Description="Cap on new downloads each run (0 = unlimited)" Type="Variable" Display="always" Required="false" Mask="false">50</Config>
+  <Config Name="Sync interval" Target="SYNC_INTERVAL" Default="6h" Mode="" Description="How often to run, e.g. 30m, 6h, 1d" Type="Variable" Display="always" Required="false" Mask="false">6h</Config>
+  <Config Name="Download format" Target="DOWNLOAD_FORMAT" Default="mp3" Mode="" Description="mp3, flac, wav or ogg" Type="Variable" Display="advanced" Required="false" Mask="false">mp3</Config>
+  <Config Name="Download bitrate" Target="DOWNLOAD_BITRATE" Default="320k" Mode="" Description="128k, 192k, 256k or 320k (mp3/ogg only)" Type="Variable" Display="advanced" Required="false" Mask="false">320k</Config>
+  <Config Name="Notification URL" Target="NOTIFY_URL" Default="" Mode="" Description="Discord, Slack or Gotify webhook URL for run summaries" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Duration tolerance (s)" Target="DURATION_TOLERANCE_SEC" Default="5" Mode="" Description="Max difference between a download's length and Spotify's before it is rejected" Type="Variable" Display="advanced" Required="false" Mask="false">5</Config>
+  <Config Name="Strict album match" Target="MATCH_STRICT_ALBUM" Default="false" Mode="" Description="true = a song must match on album too, not just artist and title" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="Retry attempts" Target="RETRY_MAX_ATTEMPTS" Default="3" Mode="" Description="Attempts before a track is parked as failed" Type="Variable" Display="advanced" Required="false" Mask="false">3</Config>
+  <Config Name="Retry cooldown (days)" Target="RETRY_COOLDOWN_DAYS" Default="7" Mode="" Description="Days before a parked track is tried again" Type="Variable" Display="advanced" Required="false" Mask="false">7</Config>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="info" Mode="" Description="debug, info, warn or error" Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+</Container>
