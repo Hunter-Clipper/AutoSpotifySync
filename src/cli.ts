@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { runAuth } from './auth.js';
 import { loadConfig } from './config.js';
 import { Store } from './db.js';
 import { createLogger } from './logger.js';
@@ -33,6 +34,11 @@ program
   .command('sync')
   .description('Pull the Spotify library and check it against Plex')
   .action(() => withApp(({ cfg, store, log }) => runSync(cfg, store, log).then(() => undefined)));
+
+program
+  .command('auth')
+  .description('One-time Spotify login that prints a SPOTIFY_REFRESH_TOKEN (run with docker -it)')
+  .action(() => runAuth(loadConfig()));
 
 program
   .command('status')
